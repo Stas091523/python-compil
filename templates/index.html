@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA IDE - ULTIMATE EDITION</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/theme/neo.min.css">
+    
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.dark-mode {
+            --bg-color: #0d1117;
+            --header-bg: rgba(22, 27, 34, 0.8);
+            --panel-bg: rgba(30, 35, 45, 0.6);
+            --text-color: #c9d1d9;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --canvas-opacity: 0.3;
+        }
+
+        body.light-mode {
+            --bg-color: #f0f3f7;
+            --header-bg: rgba(255, 255, 255, 0.7);
+            --panel-bg: rgba(255, 255, 255, 0.4);
+            --text-color: #2d3436;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --canvas-opacity: 0.15;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        #bg-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -2; background: var(--bg-color);
+        }
+
+        .bg-wrapper {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; overflow: hidden; filter: blur(100px);
+        }
+        .blob {
+            position: absolute; border-radius: 50%; 
+            opacity: 0.4; animation: move 25s infinite alternate ease-in-out;
+        }
+        .b1 { width: 500px; height: 500px; background: #fab1a0; top: -10%; left: -10%; }
+        .b2 { width: 600px; height: 600px; background: #81ecec; bottom: -10%; right: -10%; animation-delay: -5s; }
+        .b3 { width: 400px; height: 400px; background: #a29bfe; top: 30%; left: 40%; animation-delay: -10s; }
+
+        @keyframes move {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(100px, 100px) scale(1.2); }
+        }
+
+        header {
+            padding: 12px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--header-bg);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .logo { font-size: 22px; font-weight: 900; color: var(--primary); letter-spacing: 1px; }
+
+        .main-wrapper {
+            display: flex; flex: 1; padding: 20px; gap: 20px;
+            height: calc(100vh - 80px);
+        }
+
+        .panel {
+            flex: 1; display: flex; flex-direction: column;
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .panel-header {
+            padding: 10px 20px; background: rgba(255, 255, 255, 0.05);
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .label { font-size: 11px; font-weight: bold; opacity: 0.6; text-transform: uppercase; }
+
+        .btn {
+            padding: 8px 18px; border-radius: 12px; border: none;
+            font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px;
+        }
+        .btn-run { background: var(--primary); color: white; margin-left: 10px; }
+        .btn-run:hover { transform: translateY(-2px); box-shadow: 0 5px 15px var(--primary); }
+
+        .btn-tool { background: transparent; color: var(--text-color); border: 1px solid var(--border-color); margin-left: 5px; }
+        .btn-tool:hover { background: rgba(255,255,255,0.1); }
+
+        .theme-toggle {
+            font-size: 20px; width: 45px; height: 45px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            cursor: pointer; transition: 0.3s;
+        }
+
+        select {
+            padding: 8px 15px; border-radius: 12px;
+            background: var(--panel-bg); color: var(--text-color);
+            border: 1px solid var(--border-color); outline: none;
+        }
+
+        .CodeMirror { flex: 1; font-size: 16px; background: transparent !important; }
+        
+        #output {
+            flex: 1; padding: 20px; font-family: 'Consolas', monospace;
+            font-size: 15px; overflow-y: auto; white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="bg-wrapper">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div class="logo">AURA_IDE</div>
+            <select id="lang-select" onchange="changeLanguage()">
+                <option value="python">Python 3</option>
+                <option value="javascript">JavaScript</option>
+            </select>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</div>
+            <button class="btn btn-run" onclick="runCode()">▶ RUN CODE</button>
+        </div>
+    </header>
+
+    <div class="main-wrapper">
+        <div class="panel">
+            <div class="panel-header">
+                <span class="label">Source Editor</span>
+                <div>
+                    <button class="btn btn-tool" onclick="copyCode()">Copy</button>
+                    <button class="btn btn-tool" onclick="downloadCode()">Save</button>
+                </div>
+            </div>
+            <textarea id="editor"></textarea>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="label">Console Output</span>
+                <button class="btn btn-tool" onclick="document.getElementById('output').innerText = ''">Clear</button>
+            </div>
+            <div id="output">Ready to execute...</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/javascript/javascript.min.js"></script>
+
+    <script>
+
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let pts = [];
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            pts = [];
+            for (let i = 0; i < 50; i++) {
+                pts.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    size: Math.random() * 2 + 1
+                });
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const isDark = document.body.classList.contains('dark-mode');
+            ctx.fillStyle = isDark ? 'rgba(108, 92, 231, 0.4)' : 'rgba(108, 92, 231, 0.2)';
+            ctx.strokeStyle = isDark ? 'rgba(108, 92, 231, 0.15)' : 'rgba(108, 92, 231, 0.08)';
+
+            pts.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                for (let j = i + 1; j < pts.length; j++) {
+                    const dist = Math.hypot(p.x - pts[j].x, p.y - pts[j].y);
+                    if (dist < 150) {
+                        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+                    }
+                }
+            });
+            requestAnimationFrame(draw);
+        }
+        window.addEventListener('resize', initCanvas);
+        initCanvas(); draw();
+
+        const codePresets = {
+            python: "# Aura Python Mode\ndef greet():\n    print('Aura IDE: Python active')\n\ngreet()",
+            javascript: "// Aura JS Mode\nconsole.log('Aura IDE: JavaScript active');"
+        };
+
+        const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+            lineNumbers: true, matchBrackets: true, autoCloseBrackets: true
+        });
+
+        function changeLanguage(save = true) {
+            const lang = document.getElementById('lang-select').value;
+            editor.setOption("mode", lang === 'python' ? 'python' : 'javascript');
+            editor.setValue(codePresets[lang]);
+            if(save) localStorage.setItem('lang_pref', lang);
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const btn = document.getElementById('theme-btn');
+            if (body.classList.contains('dark-mode')) {
+                body.classList.replace('dark-mode', 'light-mode');
+                btn.innerText = '☀️';
+                editor.setOption("theme", "neo");
+                localStorage.setItem('theme_pref', 'light');
+            } else {
+                body.classList.replace('light-mode', 'dark-mode');
+                btn.innerText = '🌙';
+                editor.setOption("theme", "dracula");
+                localStorage.setItem('theme_pref', 'dark');
+            }
+        }
+
+        window.onload = () => {
+            const savedTheme = localStorage.getItem('theme_pref') || 'dark';
+            if (savedTheme === 'light') toggleTheme(); 
+            else editor.setOption("theme", "dracula");
+
+            const savedLang = localStorage.getItem('lang_pref') || 'python';
+            document.getElementById('lang-select').value = savedLang;
+            editor.setOption("mode", savedLang === 'python' ? 'python' : 'javascript');
+            editor.setValue(codePresets[savedLang]);
+        };
+
+        async function runCode() {
+            const lang = document.getElementById('lang-select').value;
+            const out = document.getElementById('output');
+            out.innerText = ">> Executing...\n";
+
+            if (lang === 'python') {
+                try {
+                    const res = await fetch('/run', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code: editor.getValue() })
+                    });
+                    const data = await res.json();
+                    out.innerText = data.output || "Done.";
+                } catch { out.innerText = "Error: Backend not connected."; }
+            } else {
+                let logs = "";
+                const oldLog = console.log;
+                console.log = (...a) => logs += a.join(" ") + "\n";
+                try { eval(editor.getValue()); out.innerText = logs || "Success."; }
+                catch (e) { out.innerText = "JS Error: " + e; }
+                console.log = oldLog;
+            }
+        }
+
+        function copyCode() { navigator.clipboard.writeText(editor.getValue()); alert("Copied!"); }
+        function downloadCode() {
+            const lang = document.getElementById('lang-select').value;
+            const blob = new Blob([editor.getValue()], {type: 'text/plain'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `script.${lang === 'python' ? 'py' : 'js'}`;
+            a.click();
+        }
+    </script>
+</body>
+</html>
